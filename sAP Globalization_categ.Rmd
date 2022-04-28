@@ -1,0 +1,512 @@
+---
+title: "sAP Globalization"
+author: "Guillaume Barbalat"
+date: "17/04/2022"
+output: html_document
+---
+
+# Step 0 specify the research question
+
+A recent study published in the Lancet has demonstrated the impact of globalization on child malnutrition in LMIC. Socio-economic factors (unemployment, inequalities) and cultural traits (my study!!) have also been associated to mental disorders. These parameters are also largely linked to globalization. 
+
+Hence the research question:
+
+- P: In all countries around the world vs. European countries
+- I: what is the direct impact of globalization
+- C: With different levels of globalization
+- O: on the prevalence and incidence of mental and behavioural disorders (that include alcohol, drug issues and self-harm).
+- S (study design): observational cross-sectionnal (STROBE guidelines)
+
+Heterogeneous treatment effects: further discretize globalized countries over $V=3$ different bins (with $v=\{1,2,3\}$ when $A=1$)
+
+# Step 1: specify the causal model
+
+Our DAG represents a typical W-->A-->Y<--W
+In addition, we investigate the heterogeneous treatment effect of globalization on MBD over various globalization strata.
+Note that our `Y_0` variable is that of year 1990, the more distant year to both our calculation of globalization index and 2019 DALYs (so that values are not too correlated).
+
+
+# Step 2: Specify the data and its link to the causal model
+
+Master database is the GBD study 2019.
+
+```{r warning=FALSE, message=FALSE, echo=FALSE, results=FALSE}
+#read_clean.R, which produces a final_matrix data.frame
+#check out lines 40
+rm(list=ls())
+library(dplyr)
+library(tmle)
+#gives final matrix
+loaded_data=load(file="SH_Astd_DALYs.RData")
+title_here=unique(final_matrix$cause)
+
+#only small locations (MOnaco, Miu, Vanuatu, Taiwan etc ...) are missing
+Y_0_matrix<-final_matrix %>%
+  filter(year==1990) %>%
+  select(c(location,age,sex,Y)) %>%
+  #rename(Y_0=Y) %>%
+  group_by(location) %>%
+  mutate(Y_0=sum(Y)) %>%
+  select(c(location,Y_0)) %>%
+  ungroup()
+
+A_W_matrix <- final_matrix %>% #it should be A_W_matrix
+  filter(year==2018) %>% #2018
+  select(-c(Y)) 
+
+Y_matrix <- final_matrix %>%
+  filter(year==2019) %>%
+  select(c(location,age,sex,Y)) %>%
+  group_by(location) %>%
+  mutate(Y=sum(Y)) %>%
+  select(c(location,Y)) %>%
+  ungroup()
+
+#categorize KOFGI
+#log Y
+#numerize V strata
+final_matrix_2019 <- Y_matrix %>%
+  left_join(Y_0_matrix,by=c("location")) %>%#  left_join(Y_0_matrix,by=c("location","age","sex")) %>%
+
+  left_join(A_W_matrix,by=c("location")) %>%#  left_join(A_W_matrix,by=c("location","age","sex")) %>%
+
+  #left_join(data_pop_struct,by=c("location","age","sex","year")) %>%
+  
+  mutate(log_Y=log(Y),
+         log_Y_0=log(Y_0))
+
+#run a complete cases function to identify participating locations
+final_matrix_2019=final_matrix_2019[complete.cases(final_matrix_2019),]
+
+#only quality data sources, binearize KOFGI and discretize KOFGI
+numbers_of_bins=4
+final_matrix_quality_2019 <- final_matrix_2019 %>% 
+  filter(Quality>=3) %>%
+  mutate(Quality = Quality - 3,
+         categ_KOFGI_labels=cut(KOFGI,
+                                breaks=unique(quantile(KOFGI,probs=seq(0,1,by=1/numbers_of_bins))),
+                                labels = NULL,
+                                include.lowest = TRUE),
+         categ_KOFGI=cut(KOFGI,
+                         breaks=unique(quantile(KOFGI,probs=seq(0,1,by=1/numbers_of_bins))),
+                         labels = FALSE,
+                         include.lowest = TRUE)
+         )%>%
+  fastDummies::dummy_cols(select_columns = "categ_KOFGI") %>%
+  mutate(bin_KOFGI=case_when(
+    KOFGI>median(KOFGI, na.rm=TRUE) ~ 1,#categ_KOFGI_1==1 ~ 0,
+    KOFGI<=median(KOFGI, na.rm=TRUE) ~ 0#categ_KOFGI_1==0 ~ 1
+    ),
+    bin2_KOFGI=case_when(
+      categ_KOFGI_1==1 ~ 0,
+      categ_KOFGI_1==0 ~ 1
+    )
+  )
+
+median(final_matrix_quality_2019$KOFGI)
+summary(final_matrix_quality_2019[with(final_matrix_quality_2019,categ_KOFGI==1),"KOFGI"])
+summary(final_matrix_quality_2019[with(final_matrix_quality_2019,categ_KOFGI==2),"KOFGI"])
+summary(final_matrix_quality_2019[with(final_matrix_quality_2019,categ_KOFGI==3),"KOFGI"])
+summary(final_matrix_quality_2019[with(final_matrix_quality_2019,categ_KOFGI==4),"KOFGI"])
+```
+
+## table 1
+```{r warning=FALSE, message=FALSE, echo=FALSE}
+##########
+#Table 1
+##########
+library(table1)
+my.render.cont <- function(x) {
+  with(stats.apply.rounding(stats.default(x), digits=2, round.integers = FALSE), 
+       #c("","Mean (SD) \n IQR Min-Max"=sprintf("%s (&plusmn; %s) %s %s %s", MEAN, SD, IQR, MIN, MAX)))
+       c("","Mean (SD)"=sprintf("%s (&plusmn %s)",MEAN, SD),
+         "\n Range"= sprintf("%s-%s",MIN, MAX)))
+}
+my.render.cont <- function(x) {
+  with(stats.apply.rounding(stats.default(x), digits=2, round.integers = FALSE), 
+       #c("","Mean (SD) \n IQR Min-Max"=sprintf("%s (&plusmn; %s) %s %s %s", MEAN, SD, IQR, MIN, MAX)))
+       c("","Mean (SD) \n Range"=sprintf("%s (&plusmn %s) %s-%s",MEAN, SD, MIN, MAX)))
+}
+
+glob_table<-table1(~ Y + Y_0+ unemploy + SDI + urban + unhappy + CSA + p90p100 + haqi
+                   | categ_KOFGI_labels#*sex or age
+                   ,render.continuous=my.render.cont
+                   ,data=final_matrix_quality_2019)
+
+location_table <- table1(~ location
+                         | categ_KOFGI_labels
+                         ,data=final_matrix_quality_2019)
+glob_table
+#location_table
+
+#graphs
+library(ggplot2)
+g1<-ggplot(final_matrix_quality_2019,
+           aes(y=Y,x=as.factor(categ_KOFGI_labels),colour=as.factor(categ_KOFGI_labels))) +
+  geom_boxplot() +
+  labs(x='Globalization Index (2018)',y="2019 DALYs",title = title_here)+
+  theme(legend.position = "none",
+        panel.background = element_rect(fill = "white",colour = "black"),
+        strip.background = element_rect(colour = "black", fill = "white"),
+        axis.title.x = element_text(face = "bold",size=16),
+        axis.title.y = element_text(face = "bold",size=16),#element_text(face = "bold",size=16),#element_blank()
+        axis.text.y=element_text(face = "bold",size=12),
+        axis.text.x = element_text(colour = "black", size=12),# 
+        plot.title = element_text(colour = "black",face="bold", size=20)#,hjust = 0.5)#family, 
+  )
+  #+facet_grid(cols = vars(age),rows = vars(sex))
+g1
+
+g2<-ggplot(final_matrix_quality_2019,
+           aes(y=Y_0,x=as.factor(categ_KOFGI_labels),colour=as.factor(categ_KOFGI_labels))) +
+  geom_boxplot() +
+  labs(x='Globalization Index (2018)',y="1990 DALYs",title = title_here)+
+  theme(legend.position = "none",
+        panel.background = element_rect(fill = "white",colour = "black"),
+        strip.background = element_rect(colour = "black", fill = "white"),
+        axis.title.x = element_text(face = "bold",size=16),
+        axis.title.y = element_text(face = "bold",size=16),#element_text(face = "bold",size=16),#element_blank()
+        axis.text.y=element_text(face = "bold",size=12),
+        axis.text.x = element_text(colour = "black", size=12),# 
+        plot.title = element_text(colour = "black",face="bold", size=20)#,hjust = 0.5)#family, 
+  )
+  #+facet_grid(cols = vars(age),rows = vars(sex))
+g2
+```
+
+NPSEM
+
+# Step 3: Specify the counterfactuals and the target causal parameter
+
+We're interested in the effect of globalization ($A=\{0,1\}$) on the prevalence of mental and behavioural disorders ($Y$).
+
+We define $Y_{a=1}$ as the average age-standardized DALYs rate if, possibly contrary to the fact, all countries were under a high level of globalization.
+We define $Y_{a=0}$ as the average age-standardized DALYs rate if, possibly contrary to the fact, all countries were under a low level of globalization.
+
+We then define a marginal structural model $m$ where we further substratify $A=1$ into 3 different bins $v=\{1,2,3\}$.  
+Our aim is to find $\beta={\beta_0,\beta_1,\beta_2,\beta_3}$ such that 
+
+$$E^*[Y_{a,v}]=m(a,v|β)=\beta_0+\beta_1a_1v_1+\beta_2a_1v_2+\beta_3a_1v_3$$
+
+
+# Step 4: Identifiability
+
+
+The goal of identification is to write our causal estimate as a property of the counterfactuals’ distribution using only the observed data. To do this, we must satisfy the main assumptions of temporality, consistency, conditional randomization and positivity.
+
+
+1- Temporality
+
+This assumption stipulates that baseline covariates W (measured in 2018, except for baseline outcome measure in 1990) should happen before allocation to exposure A (A=1 vs. A=0) , which should itself happen before the occurence of outcome Y (measured in 2019).
+
+
+2- Consistency
+
+The consistency assumption stipulates that there is only one version of exposure. As mentioned in the main text, the globalization index is a composite indicator, made of economic, social and political measures of globalization. Yet, the globalization index is consistently calculated for each location.
+
+
+3- Conditional randomization 
+
+This assumption means that the so-called “back-door criterion” is satisfied conditional on some strata of covariates; in other words, in our DAG all paths between the treatment and the outcome are blocked after conditioning on some set of covariates. Not considering background factors, conditioning on all baseline covariates should be sufficient to block all paths between globalization (A) and 2019 MBD (Y). 
+
+Yet, the latter would be true if background factors were uncorrelated. Specifically, for the backdoor path criterion to be satisfied, we would need to assume no interference or contagion between states after having accounted for baseline covariates. This means that, for instance, geo-spatial historical and cultural factors linking countries and relating Globalization to 2019 MBD DALYs would need to be entirely accounted for by our baseline covariates. 
+
+
+4- Positivity
+
+The positivity assumption is satisfied when, in the data, every combination of exposure and confounders has a nonzero (ie, positive) probability of receiving both levels of exposure. Otherwise formulated, in our case the positivity assumption stipulates that, given their characteristics, every country has some chance of being exposed and not exposed to globalization 
+Diagnostics that concern violations of positivity are typically provided by histograms of the inverse probability of treatment given baseline covariates (a.k.a. weights). Ideally, weights should range around a value of 1, and departure from the positivity assumption is associated with very large weights (e.g. > 500 (Platt, Delaney, & Suissa, 2012)). 
+Here, the propensity score (the probability of being exposed given a set of baseline covariates) was robustly estimated using machine learning algorithms. Histograms of weights were provided.
+
+Sensitivity analysis: 
+
+- take into account various measures of globalization.
+- sensitivity analysis based on weights' trimming
+
+# Step 5: Specify the statistical model and statistical estimand
+
+For the MSM, our statistical model aimed at estimating the following statistical equation: 
+
+$$E[Y|A,W,V]=\beta_0+\beta_1a_1v_1+\beta_2a_1v_2+\beta_3a_1v_3$$
+
+
+
+# Step 6: Estimate
+
+## Step 6a: Estimate using `tmle`
+
+```{r eval=TRUE, warning=FALSE, message=FALSE}
+library(SuperLearner)
+
+design_matrix <- final_matrix_quality_2019 # 
+all_libraries= c("SL.mean","SL.glm","SL.step.forward"
+                 #,"SL.step.interaction" too long, not sure it works
+                         ,"SL.glmnet","SL.earth","SL.gam"
+                         ,"SL.ranger"#, "SL.xgboost"
+                         )
+
+g1w <- SuperLearner(Y=design_matrix$bin2_KOFGI,
+                    X=select(design_matrix,c(unemploy:Quality,log_Y_0)),
+                    family=binomial(),
+                    SL.library = all_libraries,
+                    cvControl = list(V = 20, stratifyCV=FALSE, shuffle=TRUE),
+                    verbose=TRUE
+                    )
+
+#Treatment mechanism formula
+print(g1w)
+
+all_W=colnames(select(final_matrix_quality_2019,c(unemploy:Quality,log_Y_0)))
+all_W_linear=paste("A ~ ",paste(all_W,collapse = "+"))
+
+system.time(
+  tmle_ATE <- tmle(Y=design_matrix$log_Y,
+                     A=design_matrix$bin2_KOFGI, #bin2 (previously was bin)
+                     W=select(design_matrix,c(unemploy:haqi,Quality,log_Y_0)),
+                   Q.SL.library = all_libraries,#all_libraries, little_libraries
+                   #g.SL.library = all_libraries,#all_libraries,# little_libraries
+                   g1W = as.vector(g1w$SL.predict),
+                   verbose=TRUE,
+                   target.gwt=TRUE,
+                   V = 20
+        )
+  )
+#ATE results
+summary(1/tmle_ATE$g$g1W)
+tmle_ATE$Qinit$type
+tmle_ATE$Qinit$coef
+tmle_ATE$Qinit$Rsq.type
+tmle_ATE$Qinit$Rsq
+tmle_ATE
+
+system.time(
+  tmle_MSM_categA_unstb <- tmleMSM(Y=design_matrix$log_Y,
+                          A=design_matrix$bin2_KOFGI,
+                          W=select(design_matrix,c(unemploy:Quality,log_Y_0)),                                   
+                          V=select(design_matrix,c(categ_KOFGI_2,categ_KOFGI_3,categ_KOFGI_4)),#categ
+                          #V=select(design_matrix,categ_KOFGI),#cont
+                          ub = 1/(5/sqrt(nrow(design_matrix))/log(nrow(design_matrix))),
+                          Q.SL.library = all_libraries,#all_libraries, little_libraries
+                          g.SL.library = all_libraries,#all_libraries,# little_libraries
+                          verbose=TRUE,
+        V_SL = 20,
+        #hAVform = A~1,
+        hAV = matrix(1,nrow=nrow(design_matrix),ncol=2),#unstb weights
+        g1W = as.vector(g1w$SL.predict),
+        #gform = A~unemploy+SDI+urban+unhappy+CSA+p90p100+haqi+Quality+log_Y_0, #as.formula(all_W_linear)
+        MSM="A:V",
+        family="gaussian"
+        )
+  )
+#MSM 4 bins unstb weights
+summary(1/tmle_MSM_categA_unstb$g$g1W)
+tmle_MSM_categA_unstb$Qinit$type
+tmle_MSM_categA_unstb$Qinit$coef
+tmle_MSM_categA_unstb
+
+system.time(
+  tmle_MSM_categA <- tmleMSM(Y=design_matrix$log_Y,
+                          A=design_matrix$bin2_KOFGI,
+                          W=select(design_matrix,c(unemploy:Quality,log_Y_0)),                                   
+                          V=select(design_matrix,c(categ_KOFGI_2,categ_KOFGI_3,categ_KOFGI_4)),#categ
+                          #V=select(design_matrix,categ_KOFGI),#cont
+                          ub = 1/(5/sqrt(nrow(design_matrix))/log(nrow(design_matrix))),
+                          Q.SL.library = all_libraries,#all_libraries, little_libraries
+                          g.SL.library = all_libraries,#all_libraries,# little_libraries
+                          verbose=TRUE,
+        V_SL = 20,
+        hAVform = A~1,
+        #hAV = matrix(1,nrow=nrow(design_matrix),ncol=2),#unstb weights
+        g1W = as.vector(g1w$SL.predict),
+        #gform = A~unemploy+SDI+urban+unhappy+CSA+p90p100+haqi+Quality+log_Y_0, #as.formula(all_W_linear)
+        MSM="A:V",
+        family="gaussian"
+        )
+  )
+#MSM 4 bins stb weights
+summary(tmle_MSM_categA$g.AV$g1W/tmle_MSM_categA$g$g1W)
+tmle_MSM_categA$Qinit$type
+tmle_MSM_categA$Qinit$coef
+tmle_MSM_categA
+
+
+```
+
+
+## Step 6b: Sensitivity analysis 1- truncating weights
+```{r eval=TRUE, echo=FALSE, warning=FALSE, message=FALSE}
+wt_max=c(20,30,40)
+  
+#do_parallel
+{
+library(doParallel)
+num_cores <- detectCores()
+cl <- makeCluster(length(wt_max))
+clusterEvalQ(cl,c(library(tmle),library(dplyr)))
+clusterExport(cl, list("all_libraries"))
+
+try_this <- function(x,design_matrix, wt_max, g1w) {
+
+system.time(
+  tmle_MSM_categA_sensit <- tmleMSM(Y=design_matrix$log_Y,
+                          A=design_matrix$bin2_KOFGI,
+                          W=select(design_matrix,c(unemploy:Quality,log_Y_0)),                                   
+                          V=select(design_matrix,c(categ_KOFGI_2,categ_KOFGI_3,categ_KOFGI_4)),#categ
+                          #V=select(design_matrix,categ_KOFGI),#cont
+                          ub = wt_max[x],
+                          Q.SL.library = all_libraries,#all_libraries, little_libraries
+                          g.SL.library = all_libraries,#all_libraries,# little_libraries
+                          verbose=TRUE,
+        V_SL = 20,
+        #hAVform = A~1,
+        hAV = matrix(1,nrow=nrow(design_matrix),ncol=2),#unstb weights
+        g1W = as.vector(g1w$SL.predict),
+        #gform = A~unemploy+SDI+urban+unhappy+CSA+p90p100+haqi+Quality+log_Y_0, #as.formula(all_W_linear)
+        MSM="A:V",
+        family="gaussian"
+        )
+  )
+
+  return(list(tmle_MSM_categA_sensit,wt_max[x]))
+}
+
+system.time(anal_sensit_unstb_wt <-clusterApply(cl,1:length(wt_max),try_this,design_matrix, wt_max, g1w))
+
+stopCluster(cl)
+}
+```
+
+## Step 6c: Sensitivity analysis 2- truncating weights (stb)
+
+```{r echo=FALSE,eval=TRUE, warning=FALSE, message=FALSE}
+wt_max=c(20,30,40)
+  
+#do_parallel
+{
+library(doParallel)
+num_cores <- detectCores()
+cl <- makeCluster(length(wt_max))
+clusterEvalQ(cl,c(library(tmle),library(dplyr)))
+clusterExport(cl, list("all_libraries"))
+
+try_this <- function(x,design_matrix, wt_max, g1w) {
+
+system.time(
+  tmle_MSM_categA_sensit <- tmleMSM(Y=design_matrix$log_Y,
+                          A=design_matrix$bin2_KOFGI,
+                          W=select(design_matrix,c(unemploy:Quality,log_Y_0)),                                   
+                          V=select(design_matrix,c(categ_KOFGI_2,categ_KOFGI_3,categ_KOFGI_4)),#categ
+                          #V=select(design_matrix,categ_KOFGI),#cont
+                          ub = wt_max[x],
+                          Q.SL.library = all_libraries,#all_libraries, little_libraries
+                          g.SL.library = all_libraries,#all_libraries,# little_libraries
+                          verbose=TRUE,
+        V_SL = 20,
+        hAVform = A~1,
+        #hAV = matrix(1,nrow=nrow(design_matrix),ncol=2),#unstb weights
+        g1W = as.vector(g1w$SL.predict),
+        #gform = A~unemploy+SDI+urban+unhappy+CSA+p90p100+haqi+Quality+log_Y_0, #as.formula(all_W_linear)
+        MSM="A:V",
+        family="gaussian"
+        )
+  )
+
+  return(list(tmle_MSM_categA_sensit,wt_max[x]))
+}
+
+system.time(anal_sensit_stb_wt <-clusterApply(cl,1:length(wt_max),try_this,design_matrix, wt_max, g1w))
+
+stopCluster(cl)
+}
+```
+
+## Step 6d: results (tables and figures)
+
+```{r echo=FALSE, eval=TRUE}
+#create matrix for figure for sensitivity analysis
+GI=c("(64,72]","(72,82.5]","(82.5,91]")
+pd <- position_dodge(width = 0.3)
+
+
+#UNSTAB W
+unstb_matrix=data.frame(wt_max=round(1/(5/sqrt(nrow(design_matrix))/log(nrow(design_matrix))),1),
+                        GI=GI,
+                        psi=tmle_MSM_categA_unstb$psi[-1],
+                        lb=tmle_MSM_categA_unstb$lb[-1],
+                        ub=tmle_MSM_categA_unstb$ub[-1])
+#sensitivity analysis unstable weights
+for (i in 1:length(wt_max)) {
+print(anal_sensit_unstb_wt[[i]][[2]])
+print(anal_sensit_unstb_wt[[i]][[1]])
+tmp=data.frame(wt_max=wt_max[i],
+               GI=GI,
+                        psi=anal_sensit_unstb_wt[[i]][[1]]$psi[-1],
+                        lb=anal_sensit_unstb_wt[[i]][[1]]$lb[-1],
+                        ub=anal_sensit_unstb_wt[[i]][[1]]$ub[-1])
+unstb_matrix=rbind(unstb_matrix,tmp)
+}
+
+#then create graph for unstb weights
+g3<-ggplot(unstb_matrix,
+           aes(y=psi,x=GI,colour=as.factor(wt_max))) +
+  geom_point(cex=2, position=pd)+
+  geom_errorbar(aes(ymax=ub,ymin=lb),
+                cex=1,width=0.1, position=pd) +
+  scale_colour_manual(values = c("black", "darkblue","lightblue","grey"))+
+  geom_hline(aes(yintercept=0), linetype="dashed")+
+  labs(x='Globalization Index (2018)',y="Parameter Estimate",title = "Unstabilized weights",colour='Weight truncation')+
+  theme(#legend.position = "none",
+        panel.background = element_rect(fill = "white",colour = "black"),
+        strip.background = element_rect(colour = "black", fill = "white"),
+        axis.title.x = element_text(face = "bold",size=16),
+        axis.title.y = element_text(face = "bold",size=16),#element_text(face = "bold",size=16),#element_blank()
+        axis.text.y=element_text(face = "bold",size=12),
+        axis.text.x = element_text(colour = "black", size=12),# 
+        plot.title = element_text(colour = "black",face="bold", size=20)#,hjust = 0.5)#family, 
+  )
+g3
+
+
+
+#STAB W
+stb_matrix=data.frame(wt_max=round(1/(5/sqrt(nrow(design_matrix))/log(nrow(design_matrix))),1),
+                        GI=GI,
+                        psi=tmle_MSM_categA$psi[-1],
+                        lb=tmle_MSM_categA$lb[-1],
+                        ub=tmle_MSM_categA$ub[-1])
+#sensitivity analysis stable weights
+for (i in 1:length(wt_max)) {
+print(anal_sensit_stb_wt[[i]][[2]])
+print(anal_sensit_stb_wt[[i]][[1]])
+tmp=data.frame(wt_max=wt_max[i],
+               GI=GI,
+               psi=anal_sensit_stb_wt[[i]][[1]]$psi[-1],
+               lb=anal_sensit_stb_wt[[i]][[1]]$lb[-1],
+               ub=anal_sensit_stb_wt[[i]][[1]]$ub[-1])
+stb_matrix=rbind(stb_matrix,tmp)
+}
+
+#then create graph for stb weights
+g4<-ggplot(stb_matrix,
+           aes(y=psi,x=GI,colour=as.factor(wt_max))) +
+  geom_point(cex=2, position=pd)+
+  geom_errorbar(aes(ymax=ub,ymin=lb),
+                cex=1,width=0.1, position=pd) +
+  scale_colour_manual(values = c("black", "darkblue","lightblue","grey"))+
+  geom_hline(aes(yintercept=0), linetype="dashed")+
+  labs(x='Globalization Index (2018)',y="Parameter Estimate",title = "Stabilized weights",colour='Weight truncation')+
+  theme(#legend.position = "none",
+        panel.background = element_rect(fill = "white",colour = "black"),
+        strip.background = element_rect(colour = "black", fill = "white"),
+        axis.title.x = element_text(face = "bold",size=16),
+        axis.title.y = element_text(face = "bold",size=16),#element_text(face = "bold",size=16),#element_blank()
+        axis.text.y=element_text(face = "bold",size=12),
+        axis.text.x = element_text(colour = "black", size=12),# 
+        plot.title = element_text(colour = "black",face="bold", size=20)#,hjust = 0.5)#family, 
+  )
+  #+facet_grid(cols = vars(age),rows = vars(sex))
+g4
+
+save(tmle_ATE,tmle_MSM_categA_unstb,tmle_MSM_categA, anal_sensit_unstb_wt,anal_sensit_stb_wt,
+     file=paste0(title_here,"_results_QualitySet.RData")) 
+```
