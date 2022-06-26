@@ -1,0 +1,178 @@
+---
+title: "sAP Globalization Quality dataset sensit on trim"
+author: "Guillaume Barbalat"
+date: "17/04/2022"
+output: html_document
+---
+
+# load data and packages
+```{r warning=FALSE, message=FALSE, echo=FALSE, results=FALSE}
+#read_clean.R, which produces a final_matrix data.frame
+#check out lines 18-28
+rm(list=ls())
+getwd()
+library(dplyr)
+library(lmtp)
+library(table1)
+library(ggplot2)
+library(tidyr)
+
+loaded_data=load(file=paste0("results_lmtp_Quality.RData"))
+psi_results_data[[10]]=NULL
+psi_results_data_raw=psi_results_data
+
+idx_psi1=1;idx_psi2=2;idx_psi3=3;idx_psi4=4;
+idx_psi_null_KOFGI=5
+idx_psi_mtp_KOFGI=6
+idx_results_MSM_categ=7
+idx_results_mtp_KOFGI=8
+idx_matrix=9
+
+sensit="_sensit_trim"# 
+loaded_data=load(file=paste0("results_lmtp_Quality",sensit,".RData"))
+psi_results_data=psi_results_data
+
+idx_psi1_t1=1;idx_psi2_t1=2;idx_psi3_t1=3;idx_psi4_t1=4;
+idx_results_MSM_categ_t1=5
+idx_psi1_t2=6;idx_psi2_t2=7;idx_psi3_t2=8;idx_psi4_t2=9;
+idx_results_MSM_categ_t2=10
+idx_matrix=11
+```
+
+# loop through MBD
+``` {r echo=FALSE, warning=FALSE, message=FALSE}
+for (i in 1:length(psi_results_data)) {
+
+  
+  psi_1_t0=psi_results_data_raw[[i]][[idx_psi1]]
+  psi_2_t0=psi_results_data_raw[[i]][[idx_psi2]]
+  psi_3_t0=psi_results_data_raw[[i]][[idx_psi3]]
+  psi_4_t0=psi_results_data_raw[[i]][[idx_psi4]]
+  
+  psi_1_t1=psi_results_data[[i]][[idx_psi1_t1]]
+  psi_2_t1=psi_results_data[[i]][[idx_psi2_t1]]
+  psi_3_t1=psi_results_data[[i]][[idx_psi3_t1]]
+  psi_4_t1=psi_results_data[[i]][[idx_psi4_t1]]
+  
+  psi_1_t2=psi_results_data[[i]][[idx_psi1_t2]]
+  psi_2_t2=psi_results_data[[i]][[idx_psi2_t2]]
+  psi_3_t2=psi_results_data[[i]][[idx_psi3_t2]]
+  psi_4_t2=psi_results_data[[i]][[idx_psi4_t2]]
+  
+  results_MSM_categ_t0=psi_results_data_raw[[i]][[idx_results_MSM_categ]]
+  results_MSM_categ_t1=psi_results_data[[i]][[idx_results_MSM_categ_t1]]
+  results_MSM_categ_t2=psi_results_data[[i]][[idx_results_MSM_categ_t2]]
+  #results_MSM_categ_t2=lmtp_contrast(psi_2_t2,psi_3_t2,psi_4_t2,ref=psi_1_t2)
+
+  final_matrix_quality_2019=psi_results_data[[i]][[idx_matrix]]
+  
+  title_here=unique(final_matrix_quality_2019$cause)
+  print(title_here)
+
+ 
+
+# raw results
+print(results_MSM_categ_t1)
+print(results_MSM_categ_t2)
+
+
+
+#### Dx
+
+weights_hist <- function(psi_1,psi_2,psi_3,psi_4) {
+weights=vector(length=nrow(final_matrix_quality_2019))
+weights[psi_1$density_ratios!=0]=psi_1$density_ratios[psi_1$density_ratios!=0]
+weights[psi_2$density_ratios!=0]=psi_2$density_ratios[psi_2$density_ratios!=0]
+weights[psi_3$density_ratios!=0]=psi_3$density_ratios[psi_3$density_ratios!=0]
+weights[psi_4$density_ratios!=0]=psi_4$density_ratios[psi_4$density_ratios!=0]
+return(weights)
+}
+weights<-weights_hist(psi_1=psi_1_t1,
+                      psi_2=psi_2_t1,
+                      psi_3=psi_3_t1,
+                      psi_4=psi_4_t1)
+hist(weights, main="Histogram of weights (Trimming weights > 0.990)",xlab=NULL)
+print(summary(weights))
+#print(weights)
+
+weights<-weights_hist(psi_1_t2,psi_2_t2,psi_3_t2,psi_4_t2)
+hist(weights, main="Histogram of weights (Trimming weights > 0.975)",xlab=NULL)
+print(summary(weights))
+#print(weights)
+
+
+
+    
+ 
+### SL coeff
+coeff_pullout<-function(coeff_multiple) {
+  tmp=do.call(c,coeff_multiple);all_idx=do.call(cbind,tmp);
+  data.frame(algo=rownames(all_idx),
+                          mean=rowMeans(all_idx))
+  }
+# print(coeff_pullout(psi_1$weights_m))
+# print(coeff_pullout(psi_1$weights_r))
+# print(coeff_pullout(psi_1$weights_m))
+# print(coeff_pullout(psi_2$weights_r))
+# print(coeff_pullout(psi_3$weights_m))
+# print(coeff_pullout(psi_3$weights_r))
+# print(coeff_pullout(psi_4$weights_m))
+# print(coeff_pullout(psi_4$weights_r))
+
+
+### figure categorical MSM
+GI <- factor(levels(final_matrix_quality_2019$categ_KOFGI_labels),
+             levels=levels(final_matrix_quality_2019$categ_KOFGI_labels))
+pd <- position_dodge(width = 0.5)
+
+
+plot_matrix_t0=data.frame(GI=GI,
+                        val=exp(c(psi_1_t0$theta,psi_2_t0$theta,psi_3_t0$theta,psi_4_t0$theta)),
+                        lb=exp(c(psi_1_t0$low,psi_2_t0$low,psi_3_t0$low,psi_4_t0$low)),
+                        ub=exp(c(psi_1_t0$high,psi_2_t0$high,psi_3_t0$high,psi_4_t0$high)),
+                       pval=c(FALSE,results_MSM_categ_t0$vals$p.value<0.05),
+                       trim=0
+                        )
+
+plot_matrix_t1=data.frame(GI=GI,
+                        val=exp(c(psi_1_t1$theta,psi_2_t1$theta,psi_3_t1$theta,psi_4_t1$theta)),
+                        lb=exp(c(psi_1_t1$low,psi_2_t1$low,psi_3_t1$low,psi_4_t1$low)),
+                        ub=exp(c(psi_1_t1$high,psi_2_t1$high,psi_3_t1$high,psi_4_t1$high)),
+                       pval=c(FALSE,results_MSM_categ_t1$vals$p.value<0.05),
+                       trim=1
+                        )
+
+plot_matrix_t2=data.frame(GI=GI,
+                        val=exp(c(psi_1_t2$theta,psi_2_t2$theta,psi_3_t2$theta,psi_4_t2$theta)),
+                        lb=exp(c(psi_1_t2$low,psi_2_t2$low,psi_3_t2$low,psi_4_t2$low)),
+                        ub=exp(c(psi_1_t2$high,psi_2_t2$high,psi_3_t2$high,psi_4_t2$high)),
+                       pval=c(FALSE,results_MSM_categ_t2$vals$p.value<0.05),
+                       trim=2
+                        )
+plot_matrix=rbind(plot_matrix_t0,plot_matrix_t1, plot_matrix_t2)
+
+
+#then create graph
+g4<-ggplot(plot_matrix,
+           aes(y=val,x=GI,colour=pval, group=trim)) +
+  geom_point(cex=2, position=pd, aes(shape=factor(trim)))+
+  geom_errorbar(aes(ymax=ub,ymin=lb,linetype=factor(trim)),
+                cex=1,width=0.1, position = pd) +
+  scale_colour_manual(values = c("black","red"))+
+  #geom_hline(aes(yintercept = exp(psi_null_KOFGI$theta)), linetype="dashed" )+
+  labs(x='Globalization Index (2018)',y="2019 DALYs",title = title_here)+
+  theme(legend.position = "none",
+        panel.background = element_rect(fill = "white",colour = "black"),
+        strip.background = element_rect(colour = "black", fill = "white"),
+        axis.title.x = element_text(face = "bold",size=16),
+        axis.title.y = element_text(face = "bold",size=16),#element_text(face = "bold",size=16),#element_blank()
+        axis.text.y=element_text(face = "bold",size=12),
+        axis.text.x = element_text(colour = "black", size=12),#
+        plot.title = element_text(colour = "black",face="bold", size=20)#,hjust = 0.5)#family,
+  )
+print(g4)
+
+
+}
+
+```

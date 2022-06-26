@@ -3,7 +3,7 @@ rm(list=ls())
 header=1
 library(dplyr)
 
-title_here="NP"
+title_here="OUD"#OUD #IPV #SH #NLE #LBP
 here_data="C:/Users/Guillaume/Desktop/Recoverit 2022-04-17 at 22.09.53/_DATA/"
 here_project="C:/Users/Guillaume/Desktop/Recoverit 2022-04-17 at 22.09.53/PROJECTS/"
 outcome_has_been_loaded=0
@@ -439,7 +439,7 @@ data_quality <- data_quality %>%
 #build up raw design matrix
 #############################################################################
 final_matrix <- outcome_matrix %>%
-  left_join(dplyr::select(data_global,location:KOFGI), by=c("location","year")) %>%
+  left_join(dplyr::select(data_global,location:KOFPoGIdj), by=c("location","year")) %>%
   left_join(data_unemploy, by=c("location","year")) %>%
   left_join(data_SDI, by=c("location","year")) %>%
   left_join(dplyr::select(data_urban,c(location,year,urban)), by=c("location","year")) %>%
@@ -453,5 +453,5 @@ final_matrix <- outcome_matrix %>%
 
 #transform char into factors
 #No need as no char.
-save(file=paste0(here_project,"2022/sAP Globalization/",title_here,"_Astd_DALYs.RData"),
+save(file=paste0(here_project,"2022/sAP Globalization/",title_here,"_Astd_AllGI_DALYs.RData"),
      final_matrix)
