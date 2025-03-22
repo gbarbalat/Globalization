@@ -19,5 +19,8 @@ sensitA changes the nature of the globalization index (economic, social, cultura
 sensitY changes the outcome  
 sensittrim changes the threshold for trimming inverse probability weights  
 
+3- Print results  
+with the print_result_quality Rmd files  
+
 For more details, see our paper: Association of globalization with the burden of opioid use disorders 2019. A country-level analysis using targeted maximum likelihood estimation (https://globalizationandhealth.biomedcentral.com/articles/10.1186/s12992-023-00980-3)
 
