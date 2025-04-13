@@ -1,4 +1,6 @@
-# #                    
+# This runs tmle analysis for different types of Glob index 
+# see process_all_quality for more detail
+
 # # KOFGI,
 # # KOFGIdf,KOFGIdj,
 # # KOFEcGI,KOFSoGI,KOFPoGI
@@ -57,7 +59,6 @@ library(doParallel)
       select(c(location,Y)) 
     
     #log Y
-    #numerize V strata
     final_matrix_2019 <- Y_matrix %>%
       left_join(Y_0_matrix,by=c("location")) %>%
       left_join(A_W_matrix,by=c("location")) %>%
@@ -65,7 +66,7 @@ library(doParallel)
              log_Y_0=log(Y_0)) %>%
       rename(trt_OI=which_trt)
     
-    #run a complete cases function to identify participating locations
+    #run a complete cases function 
     final_matrix_2019=final_matrix_2019[complete.cases(final_matrix_2019),]
     
     numbers_of_bins=4
@@ -85,7 +86,7 @@ library(doParallel)
     
     W=colnames(select(final_matrix_quality_2019,c(unemploy:Quality,log_Y_0)))
     
-    #static categ
+    #4 static categ
     static_categ_1 <- function(data,trt) { rep(1,length(data[[trt]])) }
     static_categ_2 <- function(data,trt) { rep(2,length(data[[trt]])) }
     static_categ_3 <- function(data,trt) { rep(3,length(data[[trt]])) }
