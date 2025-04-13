@@ -11,7 +11,7 @@ Many covariates were included, such as employment rate, inequalities, population
 Statistical analysis employed targeted maximum likelihood estimation using the lmtp package.  
 
 1- Read and clean data  
-using read_clean.R and read_clean_AllGI.R (the latter uses all globalization indices)
+using read_clean.R and read_clean_AllGI.R (the latter uses all globalization indices).
 We then obtain databases for each disorders in .RData files 
 
 2- Perform the analysis  
