@@ -1,3 +1,6 @@
+# run analysis based on outcomes without outliers
+# see process_all_quality for more detail
+
 rm(list=ls())
 getwd()
 library(doParallel)
@@ -39,14 +42,13 @@ all_libraries= c("SL.mean","SL.glm","SL.step.forward"
       select(c(location,Y)) 
     
     #log Y
-    #numerize V strata
     final_matrix_2019 <- Y_matrix %>%
       left_join(Y_0_matrix,by=c("location")) %>%
       left_join(A_W_matrix,by=c("location")) %>%
       mutate(log_Y=log(Y),
              log_Y_0=log(Y_0))
     
-    #run a complete cases function to identify participating locations
+    #run a complete cases function 
     final_matrix_2019=final_matrix_2019[complete.cases(final_matrix_2019),]
     
     numbers_of_bins=4
@@ -103,7 +105,7 @@ all_libraries= c("SL.mean","SL.glm","SL.step.forward"
       filter(log_Y<quantile(log_Y,0.99),
              log_Y>quantile(log_Y,0.01))
     
-    ### Run MSM categ
+    ### Run MSM categ with different levels of trimming density ratios (propensity weights)
     psi_1<-lmtp_psi("categ_KOFGI",static_categ_1,"static", final_matrix_quality_2019,0.999)
     psi_2<-lmtp_psi("categ_KOFGI",static_categ_2,"static", final_matrix_quality_2019,0.999)
     psi_3<-lmtp_psi("categ_KOFGI",static_categ_3,"static", final_matrix_quality_2019,0.999)
