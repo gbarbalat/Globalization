@@ -23,6 +23,7 @@ sensit="_sensit_Y"#
 loaded_data=load(file=paste0("results_lmtp_Quality",sensit,".RData"))
 
 idx_psi1=1;idx_psi2=2;idx_psi3=3;idx_psi4=4;
+#psi_t1 and psi_t2 indicate different levels of trimming
 idx_psi1_t1=5;idx_psi2_t1=6;idx_psi3_t1=7;idx_psi4_t1=8;
 idx_psi1_t2=9;idx_psi2_t2=10;idx_psi3_t2=11;idx_psi4_t2=12;
 idx_results_MSM_categ=13
