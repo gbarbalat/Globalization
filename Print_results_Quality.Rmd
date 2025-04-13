@@ -1,0 +1,431 @@
+---
+title: "sAP Globalization Quality dataset"
+author: "Guillaume Barbalat"
+date: "17/04/2022"
+output: html_document
+---
+
+# load data and packages
+```{r warning=FALSE, message=FALSE, echo=FALSE, results=FALSE}
+#read_clean.R, which produces a final_matrix data.frame
+#check out lines 18-28
+rm(list=ls())
+getwd()
+library(dplyr)
+library(rstatix)
+#library(lmtp)
+library(table1)
+library(ggplot2)
+library(tidyr)
+library(SuperLearner)
+library(pROC)
+sensit=""# 
+loaded_data=load(file=paste0("results_lmtp_Quality",sensit,".RData"))
+
+idx_psi1=1;idx_psi2=2;idx_psi3=3;idx_psi4=4;
+idx_psi_null_KOFGI=5
+idx_psi_mtp_KOFGI=6
+idx_results_MSM_categ=7
+idx_results_mtp_KOFGI=8
+idx_matrix=9
+graphs=0
+
+```
+
+
+```{r eval=FALSE, echo=FALSE}
+
+for (i in 1:length(psi_results_data)) {
+# 
+#   print(psi_results_data[[i]][[1]])
+#   print(psi_results_data[[i]][[2]])
+#   print(psi_results_data[[i]][[3]])
+#   print(psi_results_data[[i]][[4]])
+  
+  #print(psi_results_data[[i]][[5]])
+  print(psi_results_data[[i]][[3]])
+  
+}
+# i=8
+# print(psi_results_data[[i]][[5]])
+#   print(psi_results_data[[i]][[6]])
+
+```
+
+
+
+
+# Table 1
+```{r echo=FALSE}
+
+##########
+#Table 1
+##########
+my.render.cont <- function(x) {
+  with(stats.apply.rounding(stats.default(x), digits=2, round.integers = FALSE), 
+       #c("","Mean (SD) \n IQR Min-Max"=sprintf("%s (&plusmn; %s) %s %s %s", MEAN, SD, IQR, MIN, MAX)))
+       c("","Mean (SD)"=sprintf("%s (&plusmn %s)",MEAN, SD),"\n Range"= sprintf("%s-%s",MIN, MAX)))
+}
+my.render.cont <- function(x) {
+  with(stats.apply.rounding(stats.default(x), digits=2, round.integers = FALSE), 
+       #c("","Median \n IQR Min-Max"=sprintf("%s %s %s %s", MEDIAN, IQR, MIN, MAX)))
+       # c("","Median (IQR)"=sprintf("%s (&plusmn %s)", MEDIAN, IQR),
+       #   "\n Min-Max"= sprintf("%s-%s",MIN, MAX)))
+
+      c("","Median (IQR)"=sprintf("%s (%s)",MEDIAN, IQR)))
+}
+
+pvalueANOVA <- function(x, ...) {
+  # Construct vectors of data y, and groups (strata) g
+  y <- unlist(x)
+  g <- factor(rep(1:length(x), times=sapply(x, length)))
+  
+  if (is.numeric(y)) {
+    # For numeric variables, perform a standard 2-sample t-test
+    ano <- aov(y ~ g)
+    p <- summary(ano)[[1]][[5]][1]
+    
+  } else {
+    # For categorical variables, perform a chi-squared test of independence
+    p <- chisq.test(table(y, g))$p.value
+  }
+  # Format the p-value, using an HTML entity for the less-than sign.
+  # The initial empty string places the output on the line below the variable label.
+  c("", sub("<", "&lt;", format.pval(p, digits=3, eps=0.001)))
+}
+  
+pvalueANOVA <- function(x, ...) {
+  # Construct vectors of data y, and groups (strata) g
+  y <- unlist(x)
+  g <- factor(rep(1:length(x), times=sapply(x, length)))
+  
+  if (is.numeric(y)) {
+    # For numeric variables, perform a standard 2-sample t-test
+    ano <- kruskal.test(y ~ g)
+    p <- ano$p.value
+    
+  } else {
+    # For categorical variables, perform a chi-squared test of independence
+    p <- chisq.test(table(y, g))$p.value
+  }
+  # Format the p-value, using an HTML entity for the less-than sign.
+  # The initial empty string places the output on the line below the variable label.
+  c("", sub("<", "&lt;", format.pval(p, digits=3, eps=0.001)))
+}
+
+print_table1<-function(data) {
+  glob_table<-table1(~ Y + Y_0+ unemploy + SDI + urban  + CSA + p90p100 + haqi + Quality
+                   | categ_KOFGI_labels#*sex or age
+                   ,render.continuous=my.render.cont
+                   ,data=data
+                   ,rowlabelhead = "Variables"
+                   ,overall=F
+                   ,extra.col=list(`P-value`=pvalueANOVA)
+  )
+return(glob_table)
+}
+unique(psi_results_data[[1]][[idx_matrix]]$cause);print_table1(psi_results_data[[1]][[idx_matrix]])
+unique(psi_results_data[[2]][[idx_matrix]]$cause);print_table1(psi_results_data[[2]][[idx_matrix]])
+unique(psi_results_data[[3]][[idx_matrix]]$cause);print_table1(psi_results_data[[3]][[idx_matrix]])
+unique(psi_results_data[[4]][[idx_matrix]]$cause);print_table1(psi_results_data[[4]][[idx_matrix]])
+unique(psi_results_data[[5]][[idx_matrix]]$cause);print_table1(psi_results_data[[5]][[idx_matrix]])
+unique(psi_results_data[[6]][[idx_matrix]]$cause);print_table1(psi_results_data[[6]][[idx_matrix]])
+unique(psi_results_data[[7]][[idx_matrix]]$cause);print_table1(psi_results_data[[7]][[idx_matrix]])
+unique(psi_results_data[[8]][[idx_matrix]]$cause);print_table1(psi_results_data[[8]][[idx_matrix]])
+unique(psi_results_data[[9]][[idx_matrix]]$cause);print_table1(psi_results_data[[9]][[idx_matrix]])
+#unique(psi_results_data[[10]][[idx_matrix]]$cause);print_table1(psi_results_data[[10]][[idx_matrix]])
+unique(psi_results_data[[11]][[idx_matrix]]$cause);print_table1(psi_results_data[[11]][[idx_matrix]])
+unique(psi_results_data[[12]][[idx_matrix]]$cause);print_table1(psi_results_data[[12]][[idx_matrix]])
+unique(psi_results_data[[13]][[idx_matrix]]$cause);print_table1(psi_results_data[[13]][[idx_matrix]])
+unique(psi_results_data[[14]][[idx_matrix]]$cause);print_table1(psi_results_data[[14]][[idx_matrix]])
+
+print(subset(psi_results_data[[1]][[idx_matrix]],
+             categ_KOFGI_1==1,select = "location"))
+print(subset(psi_results_data[[1]][[idx_matrix]],
+             categ_KOFGI_2==1,select = "location"))
+print(subset(psi_results_data[[1]][[idx_matrix]],
+             categ_KOFGI_3==1,select = "location"))
+print(subset(psi_results_data[[1]][[idx_matrix]],
+             categ_KOFGI_4==1,select = "location"))
+
+print(round(proportions(table(psi_results_data[[11]][[idx_matrix]]$Quality,psi_results_data[[11]][[idx_matrix]]$categ_KOFGI_labels),2),2))
+
+psi_results_data[[11]][[idx_matrix]] %>%
+  group_by(categ_KOFGI_labels) %>%
+  summarise(x=round(mean(Quality+3),2), y=round(sd(Quality+3),2))
+
+
+```
+
+
+# loop through MBD
+``` {r echo=FALSE, warning=FALSE, message=FALSE}
+for (i in 1:length(psi_results_data)) {
+  
+  if(i %in% c(6,8,9,10,13)) {next} #do not bother with all_GI index at this point
+  
+  psi_1=psi_results_data[[i]][[idx_psi1]]
+  psi_2=psi_results_data[[i]][[idx_psi2]]
+  psi_3=psi_results_data[[i]][[idx_psi3]]
+  psi_4=psi_results_data[[i]][[idx_psi4]]
+  
+  psi_null_KOFGI=psi_results_data[[i]][[idx_psi_null_KOFGI]]
+  psi_mtp_KOFGI=psi_results_data[[i]][[idx_psi_mtp_KOFGI]]
+  
+  results_MSM_categ=psi_results_data[[i]][[idx_results_MSM_categ]]
+  #this is equivalent to
+  # results_MSM_categ=lmtp_contrast(psi_2,psi_3,psi_4,
+  #                                 ref=psi_1)
+
+  results_mtp_KOFGI=psi_results_data[[i]][[idx_results_mtp_KOFGI]]
+  
+  final_matrix_quality_2019=psi_results_data[[i]][[idx_matrix]]
+  
+  title_here=unique(final_matrix_quality_2019$cause)
+  
+  print("----------")
+  print(title_here)
+  
+  print("---CV-FIT---")
+  ### CV-R2
+  pred=vector(length = length(final_matrix_quality_2019$log_Y))
+  pred[psi_1$density_ratios!=0]=psi_1$outcome_reg[psi_1$density_ratios!=0,1]
+  pred[psi_2$density_ratios!=0]=psi_2$outcome_reg[psi_2$density_ratios!=0,1]
+  pred[psi_3$density_ratios!=0]=psi_3$outcome_reg[psi_3$density_ratios!=0,1]
+  pred[psi_4$density_ratios!=0]=psi_4$outcome_reg[psi_4$density_ratios!=0,1]
+  obs=final_matrix_quality_2019$log_Y
+  caret::R2(pred = pred,obs = obs)
+  
+  all_libraries= list("SL.mean","SL.glm","SL.step.forward"
+                 ,"SL.glmnet","SL.earth"#,"SL.gam"
+                 ,"SL.ranger"#, "SL.xgboost    
+                 )
+  
+  SuperLearner_ <- function(outcome,W, family, AUC_NNLS) {
+  
+    #options()$mc.cores=6
+   fit.SL=SuperLearner::CV.SuperLearner(Y=as.matrix(outcome), X=W, family = family,
+                                        method = AUC_NNLS,
+                                        SL.library=all_libraries,
+                                        id = NULL, verbose = FALSE,
+                                        cvControl = list(V=20,stratifyCV = FALSE), 
+                                        obsWeights = NULL, saveAll = TRUE,  
+                                        parallel = 'multicore',env = parent.frame()
+   )  
+   }
+  
+  W=select(final_matrix_quality_2019,c(unemploy:Quality,log_Y_0))
+  A=final_matrix_quality_2019 %>%
+    select(starts_with("categ_KOFGI_"))
+  Y=final_matrix_quality_2019 %>%
+    select(log_Y)
+  
+  print("- 1- CV-AUC-")
+  AUC_NNLS="method.NNLS"
+  fit_SL_1=SuperLearner_(A$categ_KOFGI_1,W,"binomial",AUC_NNLS);print(summary(fit_SL_1)$Table)
+  fit_SL_2=SuperLearner_(A$categ_KOFGI_2,W,"binomial",AUC_NNLS);print(summary(fit_SL_2)$Table)
+  fit_SL_3=SuperLearner_(A$categ_KOFGI_3,W,"binomial",AUC_NNLS);print(summary(fit_SL_3)$Table)
+  fit_SL_4=SuperLearner_(A$categ_KOFGI_4,W,"binomial",AUC_NNLS);print(summary(fit_SL_4)$Table)
+  
+  print(pROC::auc(A$categ_KOFGI_1, fit_SL_1$SL.predict))
+  print(pROC::auc(A$categ_KOFGI_2, fit_SL_2$SL.predict))
+  print(pROC::auc(A$categ_KOFGI_3, fit_SL_3$SL.predict))
+  print(pROC::auc(A$categ_KOFGI_4, fit_SL_4$SL.predict))
+
+  all_pred=cbind(fit_SL_1$SL.predict,fit_SL_2$SL.predict,fit_SL_3$SL.predict,fit_SL_4$SL.predict)
+  colnames(all_pred)=c("1","2","3","4")
+  print(pROC::multiclass.roc(factor(final_matrix_quality_2019$categ_KOFGI), 
+                       all_pred))
+
+      for (i in 1:length(all_libraries)) {
+        print(all_libraries[[i]])
+        all_pred=cbind(fit_SL_1$library.predict[,paste0(all_libraries[[i]],"_All")],
+                       fit_SL_2$library.predict[,paste0(all_libraries[[i]],"_All")],
+                       fit_SL_3$library.predict[,paste0(all_libraries[[i]],"_All")],
+                       fit_SL_4$library.predict[,paste0(all_libraries[[i]],"_All")]
+                       )
+        colnames(all_pred)=c("1","2","3","4")
+        print(pROC::multiclass.roc(factor(final_matrix_quality_2019$categ_KOFGI), 
+                       all_pred))
+    }
+  
+  print("- CV-R2-")
+  fit_SL_=SuperLearner_(Y$log_Y, W, "gaussian","method.NNLS"); print(summary(fit_SL_)$Table)
+  print(caret::R2(pred = fit_SL_$SL.predict,obs = final_matrix_quality_2019$log_Y))
+
+    for (i in 1:length(all_libraries)) {
+      print(all_libraries[[i]])
+      print(caret::R2(pred = fit_SL_$library.predict[,paste0(all_libraries[[i]],"_All")],obs = final_matrix_quality_2019$log_Y))  
+    }
+
+
+
+  #Outliers based on Y
+  print("---OUTLIERS---")
+  which_max=final_matrix_quality_2019$log_Y>=quantile(final_matrix_quality_2019$log_Y,0.99)
+  print(final_matrix_quality_2019$location[which_max])
+  print(final_matrix_quality_2019[which_max,])
+    
+  which_min=final_matrix_quality_2019$log_Y<=quantile(final_matrix_quality_2019$log_Y,0.01)
+  print(final_matrix_quality_2019$location[which_min])
+  print(final_matrix_quality_2019[which_min,])
+
+  
+levels(final_matrix_quality_2019$categ_KOFGI_labels)
+
+if (graphs) {
+
+#graphs
+g1<-ggplot(final_matrix_quality_2019,
+           aes(y=Y,x=as.factor(categ_KOFGI_labels),colour=as.factor(categ_KOFGI_labels))) +
+  geom_boxplot() +
+  labs(x='Globalization Index (2018)',y="2019 DALYs",title = title_here)+
+  theme(legend.position = "none",
+        panel.background = element_rect(fill = "white",colour = "black"),
+        strip.background = element_rect(colour = "black", fill = "white"),
+        axis.title.x = element_text(face = "bold",size=16),
+        axis.title.y = element_text(face = "bold",size=16),#element_text(face = "bold",size=16),#element_blank()
+        axis.text.y=element_text(face = "bold",size=12),
+        axis.text.x = element_text(colour = "black", size=12),# 
+        plot.title = element_text(colour = "black",face="bold", size=20)#,hjust = 0.5)#family, 
+  )
+  #+facet_grid(cols = vars(age),rows = vars(sex))
+print(g1)
+
+g2<-ggplot(final_matrix_quality_2019,
+           aes(y=Y_0,x=as.factor(categ_KOFGI_labels),colour=as.factor(categ_KOFGI_labels))) +
+  geom_boxplot() +
+  labs(x='Globalization Index (2018)',y="1990 DALYs",title = title_here)+
+  theme(legend.position = "none",
+        panel.background = element_rect(fill = "white",colour = "black"),
+        strip.background = element_rect(colour = "black", fill = "white"),
+        axis.title.x = element_text(face = "bold",size=16),
+        axis.title.y = element_text(face = "bold",size=16),#element_text(face = "bold",size=16),#element_blank()
+        axis.text.y=element_text(face = "bold",size=12),
+        axis.text.x = element_text(colour = "black", size=12),# 
+        plot.title = element_text(colour = "black",face="bold", size=20)#,hjust = 0.5)#family, 
+  )
+  #+facet_grid(cols = vars(age),rows = vars(sex))
+print(g2)
+
+#print results table
+
+g3<-ggplot(final_matrix_quality_2019,
+           aes(y=Y,x=KOFGI)) +
+  geom_point() +
+  geom_smooth()+
+  labs(x='Globalization Index (2018)',y="2019 DALYs",title = title_here)+
+  theme(legend.position = "none",
+        panel.background = element_rect(fill = "white",colour = "black"),
+        strip.background = element_rect(colour = "black", fill = "white"),
+        axis.title.x = element_text(face = "bold",size=16),
+        axis.title.y = element_text(face = "bold",size=16),#element_text(face = "bold",size=16),#element_blank()
+        axis.text.y=element_text(face = "bold",size=12),
+        axis.text.x = element_text(colour = "black", size=12),# 
+        plot.title = element_text(colour = "black",face="bold", size=20)#,hjust = 0.5)#family, 
+  )
+  #+facet_grid(cols = vars(age),rows = vars(sex))
+print(g3)
+}
+
+
+
+# raw results
+print("---PARAMETER ESTIMATES---")
+print(results_MSM_categ)
+#print(results_mtp_KOFGI)
+
+
+
+#### Dx
+
+#MSM categ
+weights=vector(length=nrow(final_matrix_quality_2019))
+weights[psi_1$density_ratios!=0]=psi_1$density_ratios[psi_1$density_ratios!=0]
+weights[psi_2$density_ratios!=0]=psi_2$density_ratios[psi_2$density_ratios!=0]
+weights[psi_3$density_ratios!=0]=psi_3$density_ratios[psi_3$density_ratios!=0]
+weights[psi_4$density_ratios!=0]=psi_4$density_ratios[psi_4$density_ratios!=0]
+
+print("---WEIGHTS---")
+hist(weights, main="Histogram of weights (Trimming weights > 0.999)",xlab=NULL)
+print(summary(weights))
+
+
+#MTP
+# hist(psi_mtp_KOFGI$density_ratios, main="Histogram of weights (MTP KOFGI)",xlab=NULL)
+# print(summary(psi_mtp_KOFGI$density_ratios))
+# print(final_matrix_quality_2019[which(psi_mtp_KOFGI$density_ratios>10),])
+
+    
+ 
+### SL coeff
+coeff_pullout<-function(coeff_multiple) {
+  tmp=do.call(c,coeff_multiple);all_idx=do.call(cbind,tmp);
+  data.frame(algo=rownames(all_idx),
+                          mean=rowMeans(all_idx))
+  }
+
+# print(coeff_pullout(psi_mtp_KOFGI$weights_m))
+# print(coeff_pullout(psi_mtp_KOFGI$weights_r))
+# 
+
+print("---SL COEFFICIENTS---")
+
+print("mean coeff for the outcome regression")
+coeff_m <- coeff_pullout(psi_1$weights_m) %>%
+  left_join(coeff_pullout(psi_2$weights_m), by="algo") %>%
+  left_join(coeff_pullout(psi_3$weights_m), by="algo") %>%
+  left_join(coeff_pullout(psi_4$weights_m), by="algo") %>%
+  mutate(all_mean=(mean.x+mean.y+mean.x.x+mean.y.y)/4)
+print(coeff_m)
+
+print("mean coeff for the propensity")
+coeff_r <- coeff_pullout(psi_1$weights_r) %>%
+  left_join(coeff_pullout(psi_2$weights_r), by="algo") %>%
+  left_join(coeff_pullout(psi_3$weights_r), by="algo") %>%
+  left_join(coeff_pullout(psi_4$weights_r), by="algo") %>%
+  mutate(all_mean=(mean.x+mean.y+mean.x.x+mean.y.y)/4)
+print(coeff_r)
+
+
+# ### figure categorical MSM
+# GI <- factor(levels(final_matrix_quality_2019$categ_KOFGI_labels),
+#              levels=levels(final_matrix_quality_2019$categ_KOFGI_labels))
+# pd <- position_dodge(width = 0.3)
+# 
+# 
+# plot_matrix=data.frame(GI=GI,
+#                         val=exp(c(psi_1$theta,psi_2$theta,psi_3$theta,psi_4$theta)),
+#                         lb=exp(c(psi_1$low,psi_2$low,psi_3$low,psi_4$low)),
+#                         ub=exp(c(psi_1$high,psi_2$high,psi_3$high,psi_4$high)),
+#                        pval=c(results_MSM_categ$vals$p.value<0.05)
+#                         )
+# 
+# #then create graph
+# g4<-ggplot(plot_matrix,
+#            aes(y=val,x=GI,colour=pval)) +
+#   geom_point(cex=2)+
+#   geom_errorbar(aes(ymax=ub,ymin=lb),
+#                 cex=1,width=0.1) +
+#   scale_colour_manual(values = c("black","red"))+
+#   #geom_hline(aes(yintercept = exp(psi_null_KOFGI$theta)), linetype="dashed" )+
+#   labs(x='Globalization Index (2018)',y="2019 DALYs",title = title_here)+
+#   theme(legend.position = "none",
+#         panel.background = element_rect(fill = "white",colour = "black"),
+#         strip.background = element_rect(colour = "black", fill = "white"),
+#         axis.title.x = element_text(face = "bold",size=16),
+#         axis.title.y = element_text(face = "bold",size=16),#element_text(face = "bold",size=16),#element_blank()
+#         axis.text.y=element_text(face = "bold",size=12),
+#         axis.text.x = element_text(colour = "black", size=12),#
+#         plot.title = element_text(colour = "black",face="bold", size=20)#,hjust = 0.5)#family,
+#   )
+# print(g4)
+
+    if (sensit=="") {
+      print(final_matrix_quality_2019[which(weights>10),])#c(...)
+      #psi_results_data[[i]][[idx_matrix+1]]=which(weights>10)}
+    }
+}
+# 
+#if (sensit=="") {save(psi_results_data,file="results_lmtp_Quality.RData")}
+```
