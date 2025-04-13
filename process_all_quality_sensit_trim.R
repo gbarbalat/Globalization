@@ -1,3 +1,6 @@
+# This performs the analysis for different trimming levels
+# see process_all_quality for more detail
+
 rm(list=ls())
 getwd()
 library(doParallel)
@@ -39,14 +42,13 @@ all_libraries= c("SL.mean","SL.glm","SL.step.forward"
       select(c(location,Y)) 
     
     #log Y
-    #numerize V strata
     final_matrix_2019 <- Y_matrix %>%
       left_join(Y_0_matrix,by=c("location")) %>%
       left_join(A_W_matrix,by=c("location")) %>%
       mutate(log_Y=log(Y),
              log_Y_0=log(Y_0))
     
-    #run a complete cases function to identify participating locations
+    #run a complete cases function
     final_matrix_2019=final_matrix_2019[complete.cases(final_matrix_2019),]
     
     numbers_of_bins=4
