@@ -1,3 +1,6 @@
+# This loads, cleans the data
+# The code may seem obscure and idiosyncratic. Contact me if needed (contact detail on our article https://globalizationandhealth.biomedcentral.com/articles/10.1186/s12992-023-00980-3)
+
 close.screen(all=TRUE)
 rm(list=ls())
 header=1
@@ -359,7 +362,7 @@ if (pop_has_been_loaded==1) {
   
   try_this <- function(i) {
     
-    i=29#year 2018
+    #i=29: year 2018
     tmp1=read.csv(paste0(here_data_pop_struct,list_files[i]), sep=",") 
     tmp2<- tmp1 %>%
       mutate(location=case_when(
@@ -436,7 +439,7 @@ data_quality <- data_quality %>%
 
 
 #############################################################################
-#build up raw design matrix
+#build up raw database
 #############################################################################
 final_matrix <- outcome_matrix %>%
   left_join(dplyr::select(data_global,location:KOFGI), by=c("location","year")) %>%
