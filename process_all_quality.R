@@ -1,9 +1,12 @@
+#This runs the tmle analysis
+
 rm(list=ls())
 getwd()
 
 
 list_files=list.files(pattern = "_DALYs.RData")#
 
+#SL libraries
 all_libraries= c("SL.mean","SL.glm","SL.step.forward"
                  ,"SL.glmnet","SL.earth"#,"SL.gam"
                  ,"SL.ranger"#, "SL.xgboost"
@@ -19,7 +22,8 @@ library(doParallel)
   cl <- makeCluster(num_cores-2)
   clusterEvalQ(cl,c(library(lmtp),library(dplyr)))
   clusterExport(cl, list("all_libraries"))
-  
+
+  #function ro run the analysis
   try_this <- function(x, list_files) {
     
     #PREPARE MATRIX
@@ -32,7 +36,7 @@ library(doParallel)
       mutate(Y_0=Y) %>%
       select(c(location,Y_0)) 
     
-    A_W_matrix <- final_matrix %>% #it should be A_W_matrix
+    A_W_matrix <- final_matrix %>% 
       filter(year==2018) %>% #2018
       select(-c(Y,unhappy)) 
     
@@ -40,7 +44,7 @@ library(doParallel)
       filter(year==2019) %>%
       select(c(location,Y)) 
     
-    #log Y
+    #log Y and Y_0
     #numerize V strata
     final_matrix_2019 <- Y_matrix %>%
       left_join(Y_0_matrix,by=c("location")) %>%
@@ -51,10 +55,10 @@ library(doParallel)
     #run a complete cases function to identify participating locations
     final_matrix_2019=final_matrix_2019[complete.cases(final_matrix_2019),]
     
-    numbers_of_bins=4
+    numbers_of_bins=4 #4 bins of GI
     final_matrix_quality_2019 <- final_matrix_2019 %>% 
-      filter(Quality>=3) %>%
-      mutate(Quality = Quality - 3,
+      filter(Quality>=3) %>% #only high level quality
+      mutate(Quality = Quality - 3,#lowest quality level to 0
              categ_KOFGI_labels=cut(KOFGI,
                                     breaks=unique(quantile(KOFGI,probs=seq(0,1,by=1/numbers_of_bins))),
                                     labels = NULL,
@@ -64,6 +68,7 @@ library(doParallel)
                              labels = FALSE,
                              include.lowest = TRUE)
       )%>%
+      #to run analysis after having binearized A 
       fastDummies::dummy_cols(select_columns = "categ_KOFGI") %>%
       mutate(bin_KOFGI=case_when(
         KOFGI>median(KOFGI, na.rm=TRUE) ~ 1,#categ_KOFGI_1==1 ~ 0,
@@ -74,23 +79,26 @@ library(doParallel)
         categ_KOFGI_1==0 ~ 1
       )
       )
-    
+
+    #W columns
     W=colnames(select(final_matrix_quality_2019,c(unemploy:Quality,log_Y_0)))
-    
-     #static categ
+
+    #"policy" function for lmtp analysis
+    #for categorical anal
     static_categ_1 <- function(data,trt) { rep(1,length(data[[trt]])) }
     static_categ_2 <- function(data,trt) { rep(2,length(data[[trt]])) }
     static_categ_3 <- function(data,trt) { rep(3,length(data[[trt]])) }
     static_categ_4 <- function(data,trt) { rep(4,length(data[[trt]])) }
     
-    #change category
+    #for MTP anal with categorical scores
     d <- function(data,trt) {
       (data[[trt]] < 4)*(data[[trt]] +1) + (data[[trt]] == 4)*(data[[trt]])    }
     
-    #change index
+    #for MTP anal with raw GI scores
     d_KOFGI<- function(data,trt) {
       (data[[trt]] <=90)*(data[[trt]] +10) + (data[[trt]] > 90)*(data[[trt]] + 9)    }
-    
+
+    #lmtp function
     lmtp_psi <- function(trt,shift,intervention_type, data) {
       psi <-  lmtp_tmle(data=data, 
                         outcome="log_Y",
@@ -111,13 +119,11 @@ library(doParallel)
     psi_2<-lmtp_psi("categ_KOFGI",static_categ_2,"static", data=final_matrix_quality_2019)
     psi_3<-lmtp_psi("categ_KOFGI",static_categ_3,"static", data=final_matrix_quality_2019)
     psi_4<-lmtp_psi("categ_KOFGI",static_categ_4,"static", data=final_matrix_quality_2019)
-    
+    results_MSM_categ<-lmtp_contrast(psi_2,psi_3,psi_4,ref=psi_1)
+
     ### Run mtp KOFGI
     psi_mtp_KOFGI<-lmtp_psi("KOFGI",d_KOFGI,"mtp", data=final_matrix_quality_2019)
-    psi_null_KOFGI<-lmtp_psi("KOFGI",NULL,"mtp", data=final_matrix_quality_2019)
-    
-  
-    results_MSM_categ<-lmtp_contrast(psi_2,psi_3,psi_4,ref=psi_1)
+    psi_null_KOFGI<-lmtp_psi("KOFGI",NULL,"mtp", data=final_matrix_quality_2019) 
     results_mtp_KOFGI<-lmtp_contrast(psi_mtp_KOFGI,ref=psi_null_KOFGI)
     
     
