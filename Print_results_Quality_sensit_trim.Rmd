@@ -35,6 +35,7 @@ sensit="_sensit_trim"#
 loaded_data=load(file=paste0("results_lmtp_Quality",sensit,".RData"))
 psi_results_data=psi_results_data
 
+#psi_t1 and psi_t2 indicate different levels of trimming
 idx_psi1_t1=1;idx_psi2_t1=2;idx_psi3_t1=3;idx_psi4_t1=4;
 idx_results_MSM_categ_t1=5
 idx_psi1_t2=6;idx_psi2_t2=7;idx_psi3_t2=8;idx_psi4_t2=9;
