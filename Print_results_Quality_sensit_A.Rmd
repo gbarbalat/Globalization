@@ -5,6 +5,9 @@ date: "17/04/2022"
 output: html_document
 ---
 
+# This gives results for the analysis where A (Glob Index) is changed
+#see Print_results_Quality for more information
+
 # load data and packages
 ```{r warning=FALSE, message=FALSE, echo=FALSE, results=FALSE}
 #read_clean.R, which produces a final_matrix data.frame
@@ -53,7 +56,7 @@ print(results_MSM_categ)
 
 
 
-#### Dx
+#### density ratios (propensity weights)
 
 weights_hist <- function(psi_1,psi_2,psi_3,psi_4) {
 weights=vector(length=nrow(final_matrix_quality_2019))
